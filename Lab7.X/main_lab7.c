@@ -10,7 +10,6 @@ Hardware: PIC16F887
 Creado: 12 de abril de 2021    
 Descripcion: 
 ------------------------------------------------------------------------------*/
-//#include <xc.h>
 // CONFIG1
 #pragma config FOSC = INTRC_NOCLKOUT// Oscillator Selection bits (INTOSCIO oscillator: I/O function on RA6/OSC2/CLKOUT pin, I/O function on RA7/OSC1/CLKIN)
 #pragma config WDTE = OFF       // Watchdog Timer Enable bit (WDT disabled and can be enabled by SWDTEN bit of the WDTCON register)
@@ -27,47 +26,110 @@ Descripcion:
 #pragma config BOR4V = BOR40V   // Brown-out Reset Selection bit (Brown-out Reset set to 4.0V)
 #pragma config WRT = OFF        // Flash Program Memory Self Write Enable bits (Write protection off)
 
-
 /*-----------------------------------------------------------------------------
 ------------------------librerias a implementar ------------------------------
 -----------------------------------------------------------------------------*/
 #include <xc.h>
 #include <stdint.h>
+#define  _XTAL_FREQ 4000000  //se define el delay con FreqOsc 4Mhz
+
 
 /*-----------------------------------------------------------------------------
 ------------------------directivas del compilador------------------------------
 -----------------------------------------------------------------------------*/
-#define _tmr0_value 200
+#define _tmr0_value 237
 
 /*-----------------------------------------------------------------------------
 -------------------------------- variables -----------------------------------
 -----------------------------------------------------------------------------*/
-
+//se declara una cadena equivalente a la tabla de valores binarios de displays
+unsigned char nums_displays[] = 
+{
+    0b00111111, //0
+    0b00000110, //1
+    0b01011011, //2
+    0b01001111, //3
+    0b01100110, //4
+    0b01101101, //5
+    0b01111101, //6
+    0b00000111, //7
+    0b01111111, //8
+    0b01101111  //9
+};
+unsigned int a,b,c ; //a para centenas, b para decenas, c para unidades
+unsigned int contador = 0; // varible para incrementar
+unsigned int muxeo = 0; //variable que lleva cuenta de la multiplexada
 
 /*-----------------------------------------------------------------------------
 -------------------------prototipos de funciones-------------------------------
 -----------------------------------------------------------------------------*/
 void setup(void);  //funcion para configuracion de registros
+//int suma();        //funcion para suma de puertos
+//int resta();        //funcion para resta de puertos
 
-void __interrupt() isr(void) //si la bandera de INT TMR0
+void __interrupt() isr(void) //funcion de interrupciones
 {
-    if (T0IF==1)
+    if (RBIF==1)
+    {
+        if (RB0==1)
+        {
+            PORTA++ ; //incrementar el puerto control
+            contador++ ; //incremetentar variable contadora
+            RBIF=0; //se apaga la bandera de interrupcion
+        }
+        if (RB1==1)
+        {
+            PORTA-- ; //decrementar el puerto control
+            contador -- ; //decrementar variable contadora
+            RBIF=0 ; //se apaga la bandera de interrupcion
+        }
+    }
+
+    if (T0IF==1) //si en caso hay interrupcion por overflow del timer 0
     { 
-        
+        muxeo ++ ; //valor de mu
+        a = ((contador/100)%10) ; // valor del contador lo divide en centenas
+        b = ((contador/10)%10) ;  // valor del contador lo divide en decenas
+        c = (contador%10) ;        // valor del contador en unidades
+        T0IF=0; //se apaga la bandera de interrupcion
     }
 }
 
 /*-----------------------------------------------------------------------------
------------------------------ciclo principal----------------------------------
+----------------------------- ciclo principal----------------------------------
 -----------------------------------------------------------------------------*/
 
 void main(void)  //funcion principal sin retorno
 {  
     setup(); //en el main se manda a llamar a las configuraciones
-    
+    //suma();
+    //resta();
     
     //---------------------loop principal del programa ------------------------
-  
+    while(1) //se hace loop infinito mientras sea 1
+    {
+           
+        PORTC = nums_displays[a];
+        PORTEbits.RE0 = 1;
+        __delay_ms(10);
+        PORTEbits.RE0 = 0;
+        
+        PORTC = nums_displays[b];
+        PORTEbits.RE1 = 1;
+        __delay_ms(10);
+        PORTEbits.RE1 = 0;
+          
+        PORTC = nums_displays[c];
+        PORTEbits.RE2 = 1;
+        __delay_ms(10);
+        PORTEbits.RE2 = 0;
+              
+        
+        if(contador>=255)
+        {
+            contador=0; //se pone limite a variable
+        }
+    }
 }
 
 /*-----------------------------------------------------------------------------
@@ -81,12 +143,14 @@ void setup(void) //FUNCION PARA CONFIGURACION DE ENTRADAS Y SALIDAS
     
     //CONFIGURACION DE ENTRADAS Y SALIDAS EN PUERTOS
     TRISA = 0X00;       // Todo el puerto A es salida
-    TRISB = 0b11000000; // PortB0 y PortB1 son entradas
-    TRISC = 0X00;       // Todo el puerto C es salida
+    TRISB = 0b0000011;  // PortB0 y PortB1 son entradas
+    TRISC = 0X00;       // Todo el PortC como salida display 7seg
+    TRISE = 0x00;       // Todo el PortE como salida de transistores
             
     PORTA = 0X00;       // Todo el puerto A es salida
-    PORTB = 0b11000000; // PortB0 y PortB1 son entradas
+    PORTB = 0b00000011; // PortB0 y PortB1 son entradas
     PORTC = 0X00;       // Todo el puerto C es salida
+    PORTE = 0x00;       // Todo el puerto E es salida 
            
     //CONFIGURACION DEL OSCILADOR
     OSCCONbits.IRCF2=1; //4MHz 110
@@ -106,10 +170,15 @@ void setup(void) //FUNCION PARA CONFIGURACION DE ENTRADAS Y SALIDAS
     INTCONbits.GIE=1; //se habilitan las interrupciones globales
     INTCONbits.T0IE=1; //enable bit de int timer0
     INTCONbits.TMR0IF=0; //se apaga la bandera de int timer0
-      
+    INTCONbits.TMR0IE=1; // enable bit de IntOnCHangePortB
+    INTCONbits.RBIF=0; // se apaga la bandera de IntOnChangeB  
+    
+    //CONFIGURACION DE INT ON CHANGE PORTB
+    IOCBbits.IOCB0=1; //se abilita IntOnChangePortB, pin0
+    IOCBbits.IOCB1=1; //se abilita IntOnChangePortB, pin1
+    
+    //HABILITAR WEAK PULL UP PORTB
+    /*WPUBbits.WPUB0 = 1; //weak pull up en RB0
+    WPUBbits.WPUB0 = 1; //weak pull up en RB1*/
+    
 }
-
-/*-----------------------------------------------------------------------------
-------------------------------- funciones -------------------------------------
------------------------------------------------------------------------------*/
-

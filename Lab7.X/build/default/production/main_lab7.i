@@ -7,7 +7,7 @@
 # 1 "C:/packs/Microchip/PIC16Fxxx_DFP/1.2.33/xc8\\pic\\include\\language_support.h" 1 3
 # 2 "<built-in>" 2
 # 1 "main_lab7.c" 2
-# 15 "main_lab7.c"
+# 14 "main_lab7.c"
 #pragma config FOSC = INTRC_NOCLKOUT
 #pragma config WDTE = OFF
 #pragma config PWRTE = OFF
@@ -22,7 +22,6 @@
 
 #pragma config BOR4V = BOR40V
 #pragma config WRT = OFF
-
 
 
 
@@ -2508,7 +2507,7 @@ extern __bank0 unsigned char __resetbits;
 extern __bank0 __bit __powerdown;
 extern __bank0 __bit __timeout;
 # 28 "C:/packs/Microchip/PIC16Fxxx_DFP/1.2.33/xc8\\pic\\include\\xc.h" 2 3
-# 34 "main_lab7.c" 2
+# 32 "main_lab7.c" 2
 
 # 1 "C:\\Program Files\\Microchip\\xc8\\v2.31\\pic\\include\\c90\\stdint.h" 1 3
 # 13 "C:\\Program Files\\Microchip\\xc8\\v2.31\\pic\\include\\c90\\stdint.h" 3
@@ -2643,15 +2642,57 @@ typedef int16_t intptr_t;
 
 
 typedef uint16_t uintptr_t;
-# 35 "main_lab7.c" 2
-# 50 "main_lab7.c"
+# 33 "main_lab7.c" 2
+# 46 "main_lab7.c"
+unsigned char nums_displays[] =
+{
+    0b00111111,
+    0b00000110,
+    0b01011011,
+    0b01001111,
+    0b01100110,
+    0b01101101,
+    0b01111101,
+    0b00000111,
+    0b01111111,
+    0b01101111
+};
+unsigned int a,b,c ;
+unsigned int contador = 0;
+unsigned int muxeo = 0;
+
+
+
+
 void setup(void);
+
+
 
 void __attribute__((picinterrupt(("")))) isr(void)
 {
+    if (RBIF==1)
+    {
+        if (RB0==1)
+        {
+            PORTA++ ;
+            contador++ ;
+            RBIF=0;
+        }
+        if (RB1==1)
+        {
+            PORTA-- ;
+            contador -- ;
+            RBIF=0 ;
+        }
+    }
+
     if (T0IF==1)
     {
-
+        muxeo ++ ;
+        a = ((contador/100)%10) ;
+        b = ((contador/10)%10) ;
+        c = (contador%10) ;
+        T0IF=0;
     }
 }
 
@@ -2666,6 +2707,30 @@ void main(void)
 
 
 
+    while(1)
+    {
+
+        PORTC = nums_displays[a];
+        PORTEbits.RE0 = 1;
+        _delay((unsigned long)((10)*(4000000/4000.0)));
+        PORTEbits.RE0 = 0;
+
+        PORTC = nums_displays[b];
+        PORTEbits.RE1 = 1;
+        _delay((unsigned long)((10)*(4000000/4000.0)));
+        PORTEbits.RE1 = 0;
+
+        PORTC = nums_displays[c];
+        PORTEbits.RE2 = 1;
+        _delay((unsigned long)((10)*(4000000/4000.0)));
+        PORTEbits.RE2 = 0;
+
+
+        if(contador>=255)
+        {
+            contador=0;
+        }
+    }
 }
 
 
@@ -2679,12 +2744,14 @@ void setup(void)
 
 
     TRISA = 0X00;
-    TRISB = 0b11000000;
+    TRISB = 0b0000011;
     TRISC = 0X00;
+    TRISE = 0x00;
 
     PORTA = 0X00;
-    PORTB = 0b11000000;
+    PORTB = 0b00000011;
     PORTC = 0X00;
+    PORTE = 0x00;
 
 
     OSCCONbits.IRCF2=1;
@@ -2704,5 +2771,15 @@ void setup(void)
     INTCONbits.GIE=1;
     INTCONbits.T0IE=1;
     INTCONbits.TMR0IF=0;
+    INTCONbits.TMR0IE=1;
+    INTCONbits.RBIF=0;
+
+
+    IOCBbits.IOCB0=1;
+    IOCBbits.IOCB1=1;
+
+
+
+
 
 }
